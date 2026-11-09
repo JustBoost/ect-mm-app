@@ -202,10 +202,13 @@ void main() {
     await tester.ensureVisible(_key('show'));
     await tester.tap(_key('show'));
     await tester.pump();
-    expect(_key('fullscreen'), findsOneWidget);
+    // В первом кадре новый маршрут строится за Offstage (HeroController MaterialApp
+    // держит его вне экрана, пока анимация перехода на нуле), поэтому ищем с skipOffstage: false.
+    expect(find.byKey(const ValueKey('fullscreen'), skipOffstage: false), findsOneWidget);
     expect(hides(), 1, reason: 'сразу при открытии');
 
     await tester.pump(const Duration(milliseconds: 600));
+    expect(_key('fullscreen'), findsOneWidget);
     expect(hides(), 1, reason: 'до паузы повтора нет');
     await tester.pump(kHideBarsRetryDelay);
     expect(hides(), 2, reason: 'повтор через 1,2 с');
