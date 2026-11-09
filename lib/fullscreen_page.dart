@@ -2,6 +2,8 @@
 /// физического размера и цвета строго по центру. Касание или «Назад» — к настройкам.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -31,22 +33,65 @@ class FullscreenPage extends StatefulWidget {
   State<FullscreenPage> createState() => _FullscreenPageState();
 }
 
-class _FullscreenPageState extends State<FullscreenPage> {
+/// Пауза перед повторным скрытием системных панелей. Android не даёт скрыть их примерно 1 с
+/// после закрытия клавиатуры (ввод числа -> сразу «Показать»), поэтому скрываем ещё раз.
+const Duration kHideBarsRetryDelay = Duration(milliseconds: 1200);
+
+class _FullscreenPageState extends State<FullscreenPage> with WidgetsBindingObserver {
+  Timer? _hideTimer;
+
   @override
   void initState() {
     super.initState();
-    _safe(() => SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
+    WidgetsBinding.instance.addObserver(this);
+    _hideBars();
+    _scheduleHideBars();
+    _safe(() => SystemChrome.setSystemUIChangeCallback(_onSystemUiChange));
     ScreenInfo.keepScreenOn(true);
   }
 
   @override
   void dispose() {
+    _hideTimer?.cancel();
+    _hideTimer = null;
+    WidgetsBinding.instance.removeObserver(this);
+    _safe(() => SystemChrome.setSystemUIChangeCallback(null));
     _safe(() => SystemChrome.setEnabledSystemUIMode(
           SystemUiMode.manual,
           overlays: SystemUiOverlay.values,
         ));
     ScreenInfo.keepScreenOn(false);
     super.dispose();
+  }
+
+  /// Возврат приложения на передний план — снова скрыть панели (сразу и после паузы).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _hideBars();
+      _scheduleHideBars();
+    }
+  }
+
+  /// Панели показались (свайп от края и т.п.) — через паузу скрыть снова.
+  Future<void> _onSystemUiChange(bool systemOverlaysAreVisible) async {
+    if (systemOverlaysAreVisible && mounted) {
+      _scheduleHideBars();
+    }
+  }
+
+  void _hideBars() {
+    _safe(() => SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
+  }
+
+  void _scheduleHideBars() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(kHideBarsRetryDelay, () {
+      _hideTimer = null;
+      if (mounted) {
+        _hideBars();
+      }
+    });
   }
 
   static Future<void> _safe(Future<void> Function() f) async {

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rect_mm/fullscreen_page.dart';
 import 'package:rect_mm/main.dart';
 import 'package:rect_mm/mm.dart';
 import 'package:rect_mm/screen_info.dart';
@@ -182,5 +183,50 @@ void main() {
     await tester.pumpAndSettle();
     expect(_key('fullscreen'), findsNothing);
     expect(_field(tester, 'width'), '100');
+  });
+
+  testWidgets('полноэкранный режим: панели скрываются сразу, повторно через 1,2 с и после их появления', (tester) async {
+    await _setUpPhone(tester);
+    // перехват SystemChrome (канал flutter/platform)
+    final platformCalls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      platformCalls.add(call);
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+    int hides() => platformCalls
+        .where((c) =>
+            c.method == 'SystemChrome.setEnabledSystemUIMode' && '${c.arguments}'.contains('immersiveSticky'))
+        .length;
+
+    await tester.ensureVisible(_key('show'));
+    await tester.tap(_key('show'));
+    await tester.pump();
+    expect(_key('fullscreen'), findsOneWidget);
+    expect(hides(), 1, reason: 'сразу при открытии');
+
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(hides(), 1, reason: 'до паузы повтора нет');
+    await tester.pump(kHideBarsRetryDelay);
+    expect(hides(), 2, reason: 'повтор через 1,2 с');
+
+    // Android сообщил, что панели показались, -> через 1,2 с скрыть снова
+    await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      'flutter/platform',
+      const JSONMethodCodec().encodeMethodCall(const MethodCall('SystemChrome.systemUIChange', <Object>[true])),
+      (_) {},
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(hides(), 2);
+    await tester.pump(kHideBarsRetryDelay);
+    expect(hides(), 3, reason: 'повтор после появления панелей');
+
+    // выход: панели возвращаются, таймер отменён (повторных скрытий больше нет)
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(_key('fullscreen'), findsNothing);
+    expect(platformCalls.map((c) => c.method), contains('SystemChrome.setEnabledSystemOverlays'));
+    await tester.pump(const Duration(seconds: 3));
+    expect(hides(), 3);
   });
 }
