@@ -1,0 +1,40 @@
+Recreating project ....
+  rect_mm.iml (created)
+  android/app/build.gradle.kts (created)
+  android/rect_mm_android.iml (created)
+  android/build.gradle.kts (created)
+  README.md (created)
+  .idea/libraries/Dart_SDK.xml (created)
+  .idea/libraries/KotlinJavaRuntime.xml (created)
+  .idea/workspace.xml (created)
+  .idea/runConfigurations/main_dart.xml (created)
+  .idea/modules.xml (created)
+  android/.gitignore (created)
+  android/settings.gradle.kts (created)
+Resolving dependencies...
+Downloading packages...
+Got dependencies.
+Wrote 15 files.
+
+All done!
+You can find general documentation for Flutter at: https://docs.flutter.dev/
+Detailed API documentation is available at: https://api.flutter.dev/
+If you prefer video documentation, consider: https://www.youtube.com/c/flutterdev
+
+In order to run your application, type:
+
+  $ flutter run
+
+Your application code is in ./lib/main.dart.
+
+удалён дубль android/settings.gradle.kts (есть android/settings.gradle)
+удалён дубль android/build.gradle.kts (есть android/build.gradle)
+удалён дубль android/app/build.gradle.kts (есть android/app/build.gradle)
+--- файлы, добавленные flutter create:
+?? .metadata
+?? README.md
+?? android/.gitignore
+?? out/flutter_create.txt
+?? pubspec.lock
+--- MainActivity:
+android/app/src/main/kotlin/com/andrey/rect_mm/MainActivity.kt

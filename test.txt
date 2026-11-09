@@ -1,0 +1,18 @@
+00:00 +0: loading /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart
+00:00 +0: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +1: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +2: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +3: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +4: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +5: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +6: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +7: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +8: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +9: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +10: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: настройки: умолчания, строка экрана, синхронизация полей и ползунков
+00:00 +11: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: «Показать»: чёрный фон, прямоугольник нужного цвета и размера по центру; касание — назад
+00:01 +12: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: больше экрана: предупреждение красным, в полноэкранном режиме — обрезка без масштабирования
+00:01 +13: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: полноэкранный режим: панели скрываются сразу, повторно через 1,2 с и после их появления
+00:01 +14: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: клавиатура закрылась после открытия страницы: повтор скрытия не раньше 1,2 с после закрытия
+00:01 +15: /home/runner/work/ect-mm-app/ect-mm-app/test/widget_test.dart: выход до срабатывания таймера: таймер отменён; событие панелей после выхода ни к чему не ведёт
+00:01 +16: All tests passed!
