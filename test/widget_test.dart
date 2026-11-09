@@ -228,7 +228,7 @@ void main() {
     await tester.tapAt(const Offset(5, 5));
     await tester.pumpAndSettle();
     expect(_key('fullscreen'), findsNothing);
-    expect(platformCalls.map((c) => c.method), contains('SystemChrome.setEnabledSystemOverlays'));
+    expect(platformCalls.map((c) => c.method), contains('SystemChrome.setEnabledSystemUIOverlays'));
     await tester.pump(const Duration(seconds: 3));
     expect(hides(), 3);
   });
