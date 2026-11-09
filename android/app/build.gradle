@@ -1,0 +1,50 @@
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    // Flutter Gradle Plugin — после Android и Kotlin.
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    // namespace = пакет Kotlin MainActivity (android/app/src/main/kotlin/com/andrey/rect_mm/).
+    // Совпадает с тем, что сгенерировал бы `flutter create --org com.andrey --project-name rect_mm`,
+    // поэтому страховочный flutter create в CI не создаёт второй MainActivity.
+    namespace = "com.andrey.rect_mm"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    defaultConfig {
+        // Идентификатор приложения на телефоне (может отличаться от namespace).
+        applicationId = "com.andrey.rectmm"
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    buildTypes {
+        release {
+            // Подпись отладочным ключом, как в стандартном шаблоне Flutter.
+            // Ключ отладки у каждой машины сборки свой: APK из разных прогонов CI
+            // может не ставиться поверх прежнего — тогда удалить старое приложение.
+            signingConfig = signingConfigs.debug
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+kotlin {
+    jvmToolchain(17)
+}

@@ -1,0 +1,120 @@
+# Сборка «Прямоугольник мм» на каждый push (кроме веток builds/**) и вручную:
+# flutter analyze, flutter test, APK (release, подпись отладочным ключом).
+# Результаты (APK, вывод анализа и тестов, хвост журнала сборки, STATUS.txt) публикуются
+# в ветку builds/<ветка без claude/> — их можно скачать без входа в Actions.
+# Шаги и версии — по образцу проверенной сборки (Flutter 3.44.8 stable, Java 17 zulu).
+name: build
+on:
+  push:
+    branches-ignore: ['builds/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        # принятие лицензий: без него Gradle не докачает платформу, build-tools и NDK
+        # (compileSdk и ndkVersion берутся из Flutter: flutter.compileSdkVersion / flutter.ndkVersion)
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          packages: 'platform-tools'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: 'stable'
+          cache: true
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle', 'android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.yaml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Fill missing scaffold files (flutter create)
+        # Страховка: дописывает только недостающие файлы каркаса, существующие не трогает.
+        # Пакет MainActivity (com.andrey.rect_mm) совпадает с тем, что генерирует эта команда,
+        # поэтому второго MainActivity не появляется. Шаблон Flutter пишет Gradle-файлы на Kotlin DSL
+        # (*.gradle.kts): если рядом уже есть наш Groovy-файл (*.gradle), .kts удаляется,
+        # иначе Gradle увидит два файла настроек/сборки.
+        shell: bash
+        run: |
+          mkdir -p out
+          set +e
+          flutter create --platforms=android --org com.andrey --project-name rect_mm . 2>&1 | tee out/flutter_create.txt
+          CR=${PIPESTATUS[0]}
+          for f in android/settings.gradle.kts android/build.gradle.kts android/app/build.gradle.kts; do
+            if [ -f "$f" ] && [ -f "${f%.kts}" ]; then
+              echo "удалён дубль $f (есть ${f%.kts})" | tee -a out/flutter_create.txt
+              rm -f "$f"
+            fi
+          done
+          echo "--- файлы, добавленные flutter create:" >> out/flutter_create.txt
+          git status --porcelain --untracked-files=all >> out/flutter_create.txt
+          echo "--- MainActivity:" >> out/flutter_create.txt
+          find android/app/src/main -name 'MainActivity*' | tee -a out/flutter_create.txt
+          N=$(find android/app/src/main -name 'MainActivity*' | wc -l)
+          echo "flutter_create=$CR main_activity_count=$N" | tee out/create_steps.txt
+          test "$N" -eq 1
+
+      - name: Analyze, test, build
+        shell: bash
+        run: |
+          mkdir -p out
+          set +e
+          flutter --version 2>&1 | tee out/flutter_version.txt
+          flutter pub get 2>&1 | tee out/pub_get.txt; PUB=${PIPESTATUS[0]}
+          cp pubspec.lock out/pubspec.lock 2>/dev/null
+          flutter analyze --no-pub --no-fatal-infos 2>&1 | tee out/analyze.txt; AN=${PIPESTATUS[0]}
+          flutter test --no-pub --reporter expanded 2>&1 | tee out/test.txt; TE=${PIPESTATUS[0]}
+          flutter build apk --release --no-pub 2>&1 | tee out/build.log; BU=${PIPESTATUS[0]}
+          if [ -f build/app/outputs/flutter-apk/app-release.apk ]; then
+            cp build/app/outputs/flutter-apk/app-release.apk out/rect_mm-release.apk
+            (cd out && sha256sum rect_mm-release.apk > rect_mm-release.apk.sha256)
+          fi
+          echo "pub_get=$PUB analyze=$AN test=$TE build=$BU" | tee out/steps.txt
+          test "$PUB" -eq 0 && test "$AN" -eq 0 && test "$TE" -eq 0 && test "$BU" -eq 0
+
+      - name: Publish results to branch builds/<ветка без claude/>
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # claude/rect-app -> builds/rect-app, main -> builds/main
+          B="builds/${GITHUB_REF_NAME#claude/}"
+          PUB="$RUNNER_TEMP/pub"
+          rm -rf "$PUB" && mkdir -p "$PUB"
+          cp -r out/. "$PUB"/ 2>/dev/null || true
+          rm -f "$PUB"/build.log
+          tail -c 300000 out/build.log > "$PUB"/build_tail.log 2>/dev/null || true
+          echo "sha=${GITHUB_SHA} status=${{ job.status }} run=${GITHUB_RUN_ID} $(cat out/create_steps.txt 2>/dev/null) $(cat out/steps.txt 2>/dev/null)" > "$PUB"/STATUS.txt
+          cd "$PUB"
+          git init -q && git checkout -q -b out && git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -qm "build ${GITHUB_SHA} ${{ job.status }}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" out:refs/heads/$B
