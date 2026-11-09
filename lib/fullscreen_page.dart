@@ -34,17 +34,25 @@ class FullscreenPage extends StatefulWidget {
 }
 
 /// Пауза перед повторным скрытием системных панелей. Android не даёт скрыть их примерно 1 с
-/// после закрытия клавиатуры (ввод числа -> сразу «Показать»), поэтому скрываем ещё раз.
+/// после закрытия клавиатуры (ввод числа -> сразу «Показать»), поэтому скрываем ещё раз:
+/// через эту паузу после открытия страницы и — если клавиатура закрылась уже после
+/// открытия — через эту же паузу после её фактического закрытия (viewInsets.bottom -> 0).
 const Duration kHideBarsRetryDelay = Duration(milliseconds: 1200);
 
 class _FullscreenPageState extends State<FullscreenPage> with WidgetsBindingObserver {
   Timer? _hideTimer;
 
+  /// Нижний отступ клавиатуры (физические пиксели) при последней проверке.
+  double _keyboardInset = 0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _keyboardInset = _currentKeyboardInset();
     _hideBars();
+    // Если клавиатура ещё открыта, этот повтор будет перенесён на паузу после её закрытия
+    // (didChangeMetrics); если не закроется — сработает хотя бы он.
     _scheduleHideBars();
     _safe(() => SystemChrome.setSystemUIChangeCallback(_onSystemUiChange));
     ScreenInfo.keepScreenOn(true);
@@ -71,6 +79,24 @@ class _FullscreenPageState extends State<FullscreenPage> with WidgetsBindingObse
       _hideBars();
       _scheduleHideBars();
     }
+  }
+
+  /// Клавиатура фактически закрылась (нижний отступ > 0 -> 0) — повтор скрытия
+  /// переносится на паузу после закрытия (раньше Android панели не скрывает).
+  @override
+  void didChangeMetrics() {
+    final inset = _currentKeyboardInset();
+    final closed = _keyboardInset > 0 && inset <= 0;
+    _keyboardInset = inset;
+    if (closed && mounted) {
+      _scheduleHideBars();
+    }
+  }
+
+  static double _currentKeyboardInset() {
+    final dispatcher = WidgetsBinding.instance.platformDispatcher;
+    final view = dispatcher.implicitView ?? (dispatcher.views.isEmpty ? null : dispatcher.views.first);
+    return view?.viewInsets.bottom ?? 0;
   }
 
   /// Панели показались (свайп от края и т.п.) — через паузу скрыть снова.

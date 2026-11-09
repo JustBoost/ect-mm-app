@@ -49,6 +49,36 @@ Color _boxColor(WidgetTester tester, String k) => tester.widget<ColoredBox>(_key
 Color _swatchColor(WidgetTester tester) =>
     (tester.widget<Container>(_key('swatch')).decoration! as BoxDecoration).color!;
 
+/// Перехват SystemChrome (канал flutter/platform): все вызовы записываются, ответ — null.
+/// Возвращает функцию «сколько раз панели скрывались» (setEnabledSystemUIMode immersiveSticky).
+int Function() _countHides(WidgetTester tester) {
+  final platformCalls = <MethodCall>[];
+  tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+    platformCalls.add(call);
+    return null;
+  });
+  addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+  return () => platformCalls
+      .where((c) => c.method == 'SystemChrome.setEnabledSystemUIMode' && '${c.arguments}'.contains('immersiveSticky'))
+      .length;
+}
+
+/// Android сообщает, что системные панели показались.
+Future<void> _systemBarsShown(WidgetTester tester) =>
+    tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      'flutter/platform',
+      const JSONMethodCodec().encodeMethodCall(const MethodCall('SystemChrome.systemUIChange', <Object>[true])),
+      (_) {},
+    );
+
+/// Системная кнопка «Назад»: то же сообщение, что присылает Android.
+Future<void> _systemBack(WidgetTester tester) =>
+    tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      'flutter/navigation',
+      const JSONMethodCodec().encodeMethodCall(const MethodCall('popRoute')),
+      (_) {},
+    );
+
 void main() {
   testWidgets('настройки: умолчания, строка экрана, синхронизация полей и ползунков', (tester) async {
     final calls = await _setUpPhone(tester);
@@ -231,5 +261,69 @@ void main() {
     expect(platformCalls.map((c) => c.method), contains('SystemChrome.setEnabledSystemUIOverlays'));
     await tester.pump(const Duration(seconds: 3));
     expect(hides(), 3);
+  });
+
+  testWidgets('клавиатура закрылась после открытия страницы: повтор скрытия не раньше 1,2 с после закрытия', (tester) async {
+    await _setUpPhone(tester);
+    final hides = _countHides(tester);
+    addTearDown(tester.view.reset);
+
+    // клавиатура открыта (300 физ. пикселей снизу) в момент нажатия «Показать»
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pump();
+    await tester.ensureVisible(_key('show'));
+    await tester.tap(_key('show'));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('fullscreen'), skipOffstage: false), findsOneWidget);
+    expect(hides(), 1, reason: 'сразу при открытии');
+
+    // через 0,4 с клавиатура фактически закрылась
+    await tester.pump(const Duration(milliseconds: 400));
+    tester.view.resetViewInsets();
+    await tester.pump();
+    expect(hides(), 1);
+
+    // 0,8 с после закрытия (1,2 с от открытия) — повтора ещё нет
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(hides(), 1, reason: 'Android не даёт скрыть панели раньше ~1 с после закрытия клавиатуры');
+
+    // 1,3 с после закрытия — повтор был, и ровно один
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(hides(), 2, reason: 'повтор через 1,2 с после закрытия клавиатуры');
+    await tester.pump(const Duration(seconds: 3));
+    expect(hides(), 2);
+
+    await _systemBack(tester);
+    await tester.pumpAndSettle();
+    expect(_key('fullscreen'), findsNothing);
+  });
+
+  testWidgets('выход до срабатывания таймера: таймер отменён; событие панелей после выхода ни к чему не ведёт', (tester) async {
+    await _setUpPhone(tester);
+    final hides = _countHides(tester);
+
+    await tester.ensureVisible(_key('show'));
+    await tester.tap(_key('show'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byKey(const ValueKey('fullscreen'), skipOffstage: false), findsOneWidget);
+    expect(hides(), 1);
+
+    // «Назад», пока таймер повтора (1,2 с) ещё ждёт: обратный переход короткий
+    await _systemBack(tester);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('fullscreen'), skipOffstage: false), findsNothing);
+    expect(hides(), 1, reason: 'страница закрыта раньше, чем сработал бы таймер');
+
+    // таймер отменён: повторного скрытия нет
+    await tester.pump(const Duration(seconds: 3));
+    expect(hides(), 1);
+
+    // панели «показались» уже после закрытия страницы — ни скрытий, ни ошибок
+    await _systemBarsShown(tester);
+    await tester.pump(const Duration(seconds: 3));
+    expect(hides(), 1);
+    expect(tester.takeException(), isNull);
+    expect(_key('show'), findsOneWidget);
   });
 }
